@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hub de Gadgets Inteligentes</title>
+    <meta name="theme-color" content="#2c3e50">
+    <link rel="apple-touch-icon" href="icon.png"> 
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <header class="app-header">
+        <h1>Smart Hub</h1>
+    </header>
+
+    <main class="app-content">
+        <section id="gadget-viagem" class="gadget-screen active">
+            <h2>🚗 Calculadora de Viagem</h2>
+            <div class="segment-control">
+                <button class="active" onclick="showViagemModel('basico')">Básico</button>
+                <button onclick="showViagemModel('avancado')">Avançado</button>
+            </div>
+
+            <div id="viagem-basico" class="model-content active">
+                <h3>Modelo Básico</h3>
+                <form id="form-viagem-basico">
+                    <div class="input-group">
+                        <label for="combustivel">Preço do Combustível (R$/L):</label>
+                        <input type="number" id="combustivel" value="5.50" step="0.01" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="consumo">Consumo Médio (Km/L):</label>
+                        <input type="number" id="consumo" value="10" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="distancia">Distância da Viagem (Km):</label>
+                        <input type="number" id="distancia" value="500" required>
+                    </div>
+                    <button type="submit" class="cta-button">Calcular</button>
+                    
+                    <div class="result-box">
+                        <p>Litros Gastos: <span id="litros-gasto">0.00</span> L</p>
+                        <p>Custo Total: <span id="custo-total">R$ 0.00</span></p>
+                    </div>
+                </form>
+            </div>
+
+            <div id="viagem-avancado" class="model-content hidden">
+                 <h3>Modelo Avançado</h3>
+                 <p>Implementação do cálculo de TCO (Custos Fixos) em andamento...</p>
+            </div>
+        </section>
+
+        <section id="gadget-energia" class="gadget-screen hidden">
+            <h2>⚡ Gastos de Energia</h2>
+            <p>Em desenvolvimento. Calcularemos aqui os custos por equipamento.</p>
+        </section>
+
+        <section id="gadget-produtividade" class="gadget-screen hidden">
+            <h2>📈 Produtividade Pessoal</h2>
+            <p>Em desenvolvimento. Calculadora de Foco/Tempo.</p>
+        </section>
+        
+    </main>
+
+    <nav class="app-nav">
+        <button class="nav-item active" onclick="showGadget('gadget-viagem')">
+            <span class="icon">🚗</span> Viagem
+        </button>
+        <button class="nav-item" onclick="showGadget('gadget-energia')">
+            <span class="icon">⚡</span> Energia
+        </button>
+        <button class="nav-item" onclick="showGadget('gadget-produtividade')">
+            <span class="icon">📈</span> Foco
+        </button>
+        </nav>
+
+    <script src="app.js"></script>
+</body>
+</html>
