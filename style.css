@@ -1,0 +1,176 @@
+/* Reset Básico */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+}
+
+/* Configuração Mobile-First */
+body {
+    background-color: #f4f7f6; /* Fundo leve */
+    color: #2c3e50; /* Cor primária de texto */
+    display: flex;
+    flex-direction: column;
+    height: 100vh; /* Ocupa a altura total da viewport */
+}
+
+/* Cabeçalho do Aplicativo */
+.app-header {
+    background-color: #3498db; /* Cor de cabeçalho vibrante */
+    color: white;
+    padding: 15px 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    text-align: center;
+}
+.app-header h1 {
+    font-size: 1.5em;
+}
+
+/* Conteúdo Principal (Scrollable) */
+.app-content {
+    flex-grow: 1; /* Ocupa o espaço restante */
+    overflow-y: auto; /* Permite scroll no conteúdo */
+    padding: 20px 20px 80px 20px; /* Padding inferior para não esconder atrás da nav-bar */
+}
+
+/* Estilo para as Telas/Gadgets */
+.gadget-screen {
+    background: white;
+    padding: 20px;
+    border-radius: 15px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+    margin-bottom: 20px;
+}
+.gadget-screen h2 {
+    color: #3498db;
+    margin-bottom: 15px;
+    border-bottom: 2px solid #ecf0f1;
+    padding-bottom: 10px;
+}
+
+/* Formulários e Inputs */
+.input-group {
+    margin-bottom: 15px;
+}
+.input-group label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 5px;
+    font-size: 0.9em;
+}
+.input-group input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #bdc3c7;
+    border-radius: 8px;
+    font-size: 1em;
+    transition: border-color 0.3s;
+}
+.input-group input:focus {
+    border-color: #3498db;
+    outline: none;
+}
+
+/* Botão CTA (Call-to-Action) */
+.cta-button {
+    width: 100%;
+    padding: 15px;
+    background-color: #2ecc71; /* Cor de sucesso/ação */
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1.1em;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: 10px;
+    transition: background-color 0.3s;
+}
+.cta-button:hover {
+    background-color: #27ae60;
+}
+
+/* Segmented Control (Básico/Avançado) */
+.segment-control {
+    display: flex;
+    margin-bottom: 20px;
+    background: #ecf0f1;
+    border-radius: 8px;
+    padding: 5px;
+}
+.segment-control button {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    background: transparent;
+    color: #2c3e50;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+.segment-control button.active {
+    background-color: white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Área de Resultado */
+.result-box {
+    margin-top: 20px;
+    padding: 15px;
+    background-color: #ecf0f1;
+    border-left: 5px solid #3498db;
+    border-radius: 0 8px 8px 0;
+}
+.result-box p {
+    font-size: 1.1em;
+    margin-bottom: 5px;
+}
+.result-box span {
+    font-weight: bold;
+    color: #e74c3c; /* Cor de destaque para os resultados */
+}
+
+/* Barra de Navegação Inferior (App Style) */
+.app-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 65px;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    background-color: white;
+    box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+}
+.nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    border: none;
+    background: none;
+    color: #95a5a6;
+    padding: 5px;
+    font-size: 0.75em;
+    cursor: pointer;
+    transition: color 0.3s;
+}
+.nav-item .icon {
+    font-size: 1.5em;
+    margin-bottom: 2px;
+}
+.nav-item.active {
+    color: #3498db; /* Cor de destaque para o item ativo */
+}
+
+/* Utilitários */
+.hidden {
+    display: none !important;
+}
+.active {
+    display: block;
+}
