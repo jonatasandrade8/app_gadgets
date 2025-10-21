@@ -692,78 +692,185 @@ function gerarDocumento(event) {
     generatePdf('documentos');
 }
 
-
 // ========================================================
-// 6. FUNÇÕES DE AÇÃO GERAL (PDF/Compartilhar) - SIMPLIFICADAS
+// 6. FUNÇÕES DE AÇÃO GERAL (PDF/Compartilhar) - SOLUÇÃO DE DOWNLOAD SIMULADO
 // ========================================================
 
 /**
- * Função para gerar PDF. Simula a chamada a um Backend Python (Flask/Django)
- * que gera o documento profissional e força o download.
+ * Função utilitária para forçar o download de um arquivo de texto.
+ * @param {string} content - O conteúdo do arquivo.
+ * @param {string} filename - O nome do arquivo.
+ */
+function downloadFile(content, filename) {
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    console.log(`[Ação] Download de "${filename}" forçado com sucesso.`);
+}
+
+
+/**
+ * Função principal para gerar o relatório profissional (Simulado como TXT/CSV).
  * @param {string} gadgetId - O ID do gadget.
  */
 function generatePdf(gadgetId) {
-    let dataToSend = null;
+    let content = "";
     let fileName = "";
-    
+    let statusOK = true;
+
     switch (gadgetId) {
         case 'viagem':
-            if (Object.keys(lastViagemResults).length === 0) { alert("Calcule a viagem primeiro."); return; }
-            dataToSend = lastViagemResults;
-            fileName = dataToSend.model === 'avancado' ? "TCO_Viagem.pdf" : "Custo_Viagem.pdf";
+            if (Object.keys(lastViagemResults).length === 0) { alert("Calcule a viagem primeiro."); statusOK = false; break; }
+            content = generateViagemReportContent(lastViagemResults);
+            fileName = lastViagemResults.model === 'avancado' ? "TCO_Viagem_Relatorio.txt" : "Custo_Viagem_Relatorio.txt";
             break;
         case 'energia':
-            if (lastEnergiaResults.equipamentos?.length === 0) { alert("Adicione equipamentos primeiro."); return; }
-            dataToSend = lastEnergiaResults;
-            fileName = "Relatorio_Consumo_Energia.pdf";
+            if (lastEnergiaResults.equipamentos?.length === 0) { alert("Adicione equipamentos primeiro."); statusOK = false; break; }
+            content = generateEnergiaReportContent(lastEnergiaResults);
+            fileName = "Consumo_Energia_Relatorio.csv"; // CSV para tabelas
             break;
         case 'produtividade':
-            if (Object.keys(lastProdutividadeResults).length === 0) { alert("Analise a produtividade primeiro."); return; }
-            dataToSend = lastProdutividadeResults;
-            fileName = "Relatorio_Produtividade.pdf";
+            if (Object.keys(lastProdutividadeResults).length === 0) { alert("Analise a produtividade primeiro."); statusOK = false; break; }
+            content = generateProdutividadeReportContent(lastProdutividadeResults);
+            fileName = "Produtividade_Relatorio.txt";
             break;
         case 'documentos':
-            if (lastDocumentosData.itens?.length === 0) { alert("Adicione itens ao documento primeiro."); return; }
-            dataToSend = lastDocumentosData;
-            fileName = `${getDocTitle(docType).replace(/\s/g, '_')}_${Date.now()}.pdf`;
+            if (lastDocumentosData.itens?.length === 0) { alert("Adicione itens ao documento primeiro."); statusOK = false; break; }
+            content = generateDocumentosReportContent(lastDocumentosData);
+            fileName = `${getDocTitle(docType).replace(/\s/g, '_')}_Documento.txt`;
             break;
         default:
             alert("Gadget não encontrado.");
-            return;
+            statusOK = false;
     }
 
-    // --- SIMULAÇÃO DE CHAMADA AO BACKEND PYTHON ---
-    const dataString = JSON.stringify(dataToSend, null, 2);
-    const apiEndpoint = `/api/generate_pdf/${gadgetId}`;
-    
-    console.log(`[FRONTEND] Enviando dados para o Backend Python: ${apiEndpoint}`);
-    console.log(dataString);
+    if (statusOK) {
+        // Alerta opcional para explicar a simulação de download
+        alert(`Relatório profissional gerado! O arquivo "${fileName}" será baixado agora.
+(Em um ambiente real, este seria um PDF limpo e vetorial, gerado pelo Backend Python.)`);
+        downloadFile(content, fileName);
+    }
+}
 
-    alert(`[SIMULAÇÃO DE BACKEND PYTHON] Sucesso! O Backend recebeu os dados de ${gadgetId} e gerou o relatório profissional.
+
+// --- Funções de Geração de Conteúdo Estruturado (Relatórios Profissionais) ---
+
+function generateViagemReportContent(data) {
+    let report = `RELATÓRIO DE CUSTO DE VIAGEM (${data.model.toUpperCase()})\n`;
+    report += "================================================\n";
+    report += `Data de Geração: ${new Date().toLocaleDateString('pt-BR')}\n\n`;
     
-    O arquivo "${fileName}" seria baixado agora. (Role a página para ver o código Python de como isso seria feito).`);
+    report += "1. PARÂMETROS DA VIAGEM\n";
+    report += `   Distância Total: ${data.distancia.toFixed(0)} Km\n`;
+    report += `   Consumo Médio: ${data.consumoMedio.toFixed(2)} Km/L\n`;
+    report += `   Preço do Combustível: R$ ${data.precoCombustivel.toFixed(2)}/L\n\n`;
     
-    // Em um ambiente real:
-    // fetch(apiEndpoint, {
-    //     method: 'POST',
-    //     headers: { 'Content-Type': 'application/json' },
-    //     body: dataString
-    // }).then(response => response.blob())
-    //   .then(blob => {
-    //        // Lógica de download
-    //        const url = window.URL.createObjectURL(blob);
-    //        const a = document.createElement('a');
-    //        a.style.display = 'none';
-    //        a.href = url;
-    //        a.download = fileName;
-    //        document.body.appendChild(a);
-    //        a.click();
-    //        window.URL.revokeObjectURL(url);
-    //    });
+    report += "2. CUSTOS GERAIS\n";
+    report += `   Litros Gastos: ${data.litrosGasto.toFixed(2)} L\n`;
+    report += `   Custo do Combustível: R$ ${data.custoTotalCombustivel ? data.custoTotalCombustivel.toFixed(2) : data.custoTotal.toFixed(2)}\n`;
+    
+    if (data.model === 'avancado') {
+        report += "\n3. CUSTOS TCO (Total Cost of Ownership)\n";
+        report += `   Pedágios/Taxas: R$ ${data.pedagios.toFixed(2)}\n`;
+        report += `   Custo Manutenção/Km: R$ ${data.custoManutencao.custoKmManutencaoTotal.toFixed(4)}\n`;
+        report += `   Custo Total Manutenção (Viagem): R$ ${data.custoManutencao.custoTotalManutencaoViagem.toFixed(2)}\n`;
+
+        if (data.custoExtras.diaria) {
+             report += `   Diárias/Alimentação (${data.custoExtras.diaria.diasViagem} dias): R$ ${data.custoExtras.diaria.custo.toFixed(2)}\n`;
+        }
+        if (data.custoExtras.arla) {
+            report += `   Custo ARLA 32: R$ ${data.custoExtras.arla.custo.toFixed(2)}\n`;
+        }
+        report += `   Total de Custos Extras: R$ ${data.custoExtras.total.toFixed(2)}\n`;
+    }
+    
+    report += "\n================================================\n";
+    report += `CUSTO TOTAL FINAL DA VIAGEM: R$ ${data.custoTotal.toFixed(2)}\n`;
+    report += "================================================\n";
+    return report;
+}
+
+function generateEnergiaReportContent(data) {
+    let report = `RELATÓRIO DE CONSUMO DE ENERGIA MENSAL\n`;
+    report += "================================================\n";
+    report += `Valor do kW/h: R$ ${data.valorKWh.toFixed(3)}\n\n`;
+    
+    // Formato CSV para facilitar a importação
+    report += "Equipamento,Potência (W),Uso Diário (h),Dias/Mês,Custo Mensal (R$)\n";
+
+    data.equipamentos.forEach(eq => {
+        report += `${eq.nome},${eq.potencia},${eq.tempoTotalH.toFixed(1)},${eq.diasUso},${eq.custo.toFixed(2)}\n`;
+    });
+
+    report += "\n================================================\n";
+    report += `CUSTO TOTAL MENSAL ESTIMADO: R$ ${data.custoTotal.toFixed(2)}\n`;
+    report += "================================================\n";
+    return report;
+}
+
+function generateProdutividadeReportContent(data) {
+    let report = `RELATÓRIO DE PRODUTIVIDADE E ANÁLISE DE VALOR\n`;
+    report += "================================================\n";
+    report += `Salário Mensal Estimado: R$ ${data.salarioMensal.toFixed(2)}\n`;
+    report += `Custo Estimado da Hora de Trabalho: R$ ${data.custoHora.toFixed(2)}\n\n`;
+
+    report += "1. DISTRIBUIÇÃO DO TEMPO (Horas Diárias)\n";
+    report += `   - Trabalho/Foco: ${data.horasTrabalho.toFixed(1)}h\n`;
+    report += `   - Estudo/Desenvolvimento: ${data.tempoEstudo.toFixed(1)}h\n`;
+    report += `   - Lazer/Pessoal: ${data.tempoLazer.toFixed(1)}h\n`;
+    report += `   - Deslocamento/Trânsito: ${data.tempoDeslocamento.toFixed(1)}h\n`;
+    report += `   - Distrações (Não-Produtivo): ${data.tempoDistracao.toFixed(1)}h\n\n`;
+
+    report += "2. ANÁLISE DE IMPACTO\n";
+    report += `   Taxa de Eficiência (Diária): ${data.taxaEficiencia.toFixed(1)}%\n`;
+    report += `   Horas Perdidas na Semana por Distração: ${data.horasPerdidasSemana.toFixed(1)}h\n`;
+    report += `   CUSTO DIÁRIO DA DISTRAÇÃO: R$ ${data.custoDistracaoDiario.toFixed(2)}\n`;
+    report += `   CUSTO SEMANAL DA DISTRAÇÃO: R$ ${data.custoDistracaoSemanal.toFixed(2)}\n\n`;
+    
+    report += "3. INSIGHT\n";
+    report += `   > ${data.insight}\n`;
+    
+    report += "================================================\n";
+    return report;
+}
+
+function generateDocumentosReportContent(data) {
+    const docTitle = getDocTitle(data.docType).toUpperCase();
+    let report = `${docTitle}\n`;
+    report += "================================================\n";
+    report += `EMITENTE: ${data.empresa} (CNPJ/CPF: ${data.cnpj})\n`;
+    report += `Contato: ${data.telefone} / ${data.email}\n`;
+    report += `Data: ${new Date().toLocaleDateString('pt-BR')}\n\n`;
+
+    report += "ITENS (Descrição | Qtd | V. Unitário | V. Total)\n";
+    report += "------------------------------------------------\n";
+    data.itens.forEach(item => {
+        report += `${item.descricao} | ${item.quantidade} | R$ ${item.valorUnitario.toFixed(2)} | R$ ${item.valorTotal.toFixed(2)}\n`;
+    });
+    report += "------------------------------------------------\n";
+
+    report += `VALOR TOTAL DO DOCUMENTO: R$ ${data.valorTotal.toFixed(2)}\n\n`;
+
+    if (data.infoExtra) {
+        report += "OBSERVAÇÕES/CONDIÇÕES:\n";
+        report += `${data.infoExtra}\n\n`;
+    }
+    
+    report += "Assinatura do Emissor: ________________________\n";
+    report += "Assinatura do Cliente: ________________________\n";
+    report += "================================================\n";
+    return report;
 }
 
 /**
- * Função para simular o compartilhamento nativo.
+ * Função para simular o compartilhamento nativo. (Mantida)
  * @param {string} gadgetId - O ID do gadget.
  */
 function shareContent(gadgetId) {
@@ -785,21 +892,6 @@ function shareContent(gadgetId) {
             alert(`[Ação Simulado] Compartilhamento de ${title} pronto! Use a função nativa do seu dispositivo.`);
         });
     } else {
-        alert(`[Ação Simulado] Compartilhamento de ${title} pronto! (URL: ${window.location.href}). Clique em Baixar para obter o PDF.`);
+        alert(`[Ação Simulado] Compartilhamento de ${title} pronto! (URL: ${window.location.href}). Clique em Baixar para obter o relatório profissional.`);
     }
 }
-
-
-// ========================================================
-// 7. INICIALIZAÇÃO DA APLICAÇÃO (Mantido)
-// ========================================================
-
-document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('.app-nav .nav-item').forEach(button => {
-        button.addEventListener('click', () => {
-            showGadget(button.getAttribute('data-gadget-id'));
-        });
-    });
-
-    showGadget('viagem');
-});
