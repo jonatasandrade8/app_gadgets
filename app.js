@@ -7,8 +7,15 @@ let equipamentos = []; // Estado global para o gadget de Energia
 let docItens = [];     // Estado global para o gadget de Documentos
 let docType = 'OS';    // Estado global para o tipo de Documento (OS, Nota, Orcamento)
 
+// Variáveis de estado para armazenar os últimos resultados calculados (uso no PDF)
+let lastViagemResults = {};
+let lastEnergiaResults = {};
+let lastProdutividadeResults = {};
+let lastDocumentosData = {};
+
+
 // ========================================================
-// 1. O ROUTER E NAVEGAÇÃO
+// 1. O ROUTER E NAVEGAÇÃO (Mantido)
 // ========================================================
 
 const gadgetRenderers = {
@@ -41,7 +48,7 @@ function showGadget(gadgetId) {
 
 
 // ========================================================
-// 2. GADGET 1: CALCULADORA DE VIAGEM (RENDERIZAÇÃO E LÓGICA)
+// 2. GADGET 1: CALCULADORA DE VIAGEM (Cálculos atualizados para estado)
 // ========================================================
 
 function renderViagem() {
@@ -157,14 +164,18 @@ function renderViagem() {
                         <p>Custos Extras (Arla + Diárias): <span id="custo-extras">R$ 0.00</span></p>
                         <p>Custo Total (TCO): <span id="custo-total-av">R$ 0.00</span></p>
                     </div>
-                     <button type="button" class="cta-button small-button action-button" onclick="generatePdf('viagem')">
-                        Baixar/Compartilhar Relatório (PDF)
-                    </button>
+                    <div class="action-buttons-group">
+                        <button type="button" class="cta-button small-button action-button" onclick="generatePdf('viagem')">
+                            Baixar Relatório (PDF)
+                        </button>
+                        <button type="button" class="cta-button small-button secondary-button" onclick="shareContent('viagem')">
+                            Compartilhar
+                        </button>
+                    </div>
                 </form>
             </div>
         </section>
     `;
-    // Anexa os Listeners após a injeção do HTML
     attachViagemListeners();
 }
 
@@ -188,7 +199,7 @@ function attachViagemListeners() {
     showViagemModel('basico');
 }
 
-// Funções auxiliares de Viagem
+// Funções auxiliares de Viagem (mantidas)
 
 function toggleHeavyVehicleFields() {
     const isChecked = document.getElementById('check_pesado').checked;
@@ -220,12 +231,11 @@ function showViagemModel(model) {
 }
 
 /**
- * Cálculo Básico (usando parseFloat para garantir float)
+ * Cálculo Básico (Salva resultados no estado)
  */
 function calcularViagemBasico(event) {
     event.preventDefault(); 
     
-    // Todos os valores são tratados como float
     const precoCombustivel = parseFloat(document.getElementById('combustivel').value);
     const consumoMedio = parseFloat(document.getElementById('consumo').value);
     const distancia = parseFloat(document.getElementById('distancia').value);
@@ -238,17 +248,26 @@ function calcularViagemBasico(event) {
     const litrosGasto = distancia / consumoMedio;
     const custoTotal = litrosGasto * precoCombustivel;
 
+    // Salva o estado para o PDF
+    lastViagemResults = {
+        model: 'basico',
+        distancia: distancia,
+        precoCombustivel: precoCombustivel,
+        consumoMedio: consumoMedio,
+        litrosGasto: litrosGasto,
+        custoTotal: custoTotal
+    };
+
     document.getElementById('litros-gasto').textContent = litrosGasto.toFixed(2);
     document.getElementById('custo-total').textContent = `R$ ${custoTotal.toFixed(2)}`;
 }
 
 /**
- * Cálculo Avançado (TCO)
+ * Cálculo Avançado (TCO) (Salva resultados no estado)
  */
 function calcularViagemAvancado(event) {
     event.preventDefault(); 
 
-    // Tratamento de float garantido pelo parseFloat()
     const precoCombustivel = parseFloat(document.getElementById('combustivel_av').value) || 0;
     const consumoMedio = parseFloat(document.getElementById('consumo_av').value) || 0;
     const distancia = parseFloat(document.getElementById('distancia_av').value) || 0;
@@ -264,7 +283,7 @@ function calcularViagemAvancado(event) {
          return;
     }
 
-    // CÁLCULO DE CUSTOS DE MANUTENÇÃO (Evita divisão por zero com || 1)
+    // CÁLCULO DE CUSTOS DE MANUTENÇÃO
     const custoKmManutencaoTotal = (custoPneu / kmPneu) + (custoOleo / kmOleo);
     const custoTotalManutencaoViagem = distancia * custoKmManutencaoTotal;
 
@@ -274,6 +293,8 @@ function calcularViagemAvancado(event) {
 
     // CÁLCULO DE CUSTOS EXTRAS (ARLA + DIÁRIAS)
     let custoExtras = 0;
+    let arlaData = null;
+    let diariaData = null;
 
     // ARLA
     if (document.getElementById('check_pesado') && document.getElementById('check_pesado').checked) {
@@ -283,6 +304,7 @@ function calcularViagemAvancado(event) {
         if (distancia > 0 && consumoArla > 0 && precoArla > 0) {
             const litrosArla = (distancia / 100) * consumoArla;
             custoExtras += litrosArla * precoArla;
+            arlaData = { litrosArla, precoArla, consumoArla, custo: litrosArla * precoArla };
         }
     }
 
@@ -293,11 +315,34 @@ function calcularViagemAvancado(event) {
         
         if (diasViagem > 0 && custoDiaria > 0) {
             custoExtras += diasViagem * custoDiaria;
+            diariaData = { diasViagem, custoDiaria, custo: diasViagem * custoDiaria };
         }
     }
 
     // CUSTO FINAL (TCO)
     const custoTotalAvancado = custoTotalCombustivel + custoTotalManutencaoViagem + pedagios + custoExtras;
+
+    // Salva o estado para o PDF
+    lastViagemResults = {
+        model: 'avancado',
+        distancia: distancia,
+        precoCombustivel: precoCombustivel,
+        consumoMedio: consumoMedio,
+        litrosGasto: litrosGasto,
+        custoTotalCombustivel: custoTotalCombustivel,
+        pedagios: pedagios,
+        custoManutencao: {
+            custoKmManutencaoTotal,
+            custoPneu, kmPneu, custoOleo, kmOleo,
+            custoTotalManutencaoViagem
+        },
+        custoExtras: {
+            total: custoExtras,
+            arla: arlaData,
+            diaria: diariaData
+        },
+        custoTotal: custoTotalAvancado
+    };
 
     document.getElementById('custo-km-manutencao').textContent = `R$ ${custoKmManutencaoTotal.toFixed(4)}`; 
     document.getElementById('custo-extras').textContent = `R$ ${custoExtras.toFixed(2)}`;
@@ -306,7 +351,7 @@ function calcularViagemAvancado(event) {
 
 
 // ========================================================
-// 3. GADGET 2: CALCULADORA DE ENERGIA (RENDERIZAÇÃO E LÓGICA)
+// 3. GADGET 2: CALCULADORA DE ENERGIA (Cálculos atualizados para estado)
 // ========================================================
 
 function renderEnergia() {
@@ -351,9 +396,14 @@ function renderEnergia() {
             <div class="result-box final-result-box">
                 <p>Custo Total Mensal Estimado: <span id="custo-total-energia">R$ 0.00</span></p>
             </div>
-            <button type="button" class="cta-button small-button action-button" onclick="generatePdf('energia')">
-                Baixar/Compartilhar Relatório (PDF)
-            </button>
+            <div class="action-buttons-group">
+                <button type="button" class="cta-button small-button action-button" onclick="generatePdf('energia')">
+                    Baixar Relatório (PDF)
+                </button>
+                <button type="button" class="cta-button small-button secondary-button" onclick="shareContent('energia')">
+                    Compartilhar
+                </button>
+            </div>
         </section>
     `;
     attachEnergiaListeners();
@@ -362,8 +412,12 @@ function renderEnergia() {
 
 function attachEnergiaListeners() {
     document.getElementById('form-novo-equipamento').addEventListener('submit', adicionarEquipamento);
-    document.getElementById('valor_kwh').addEventListener('change', renderizarEquipamentos);
-    document.getElementById('valor_kwh').addEventListener('input', renderizarEquipamentos); 
+    // Renderiza e recalcula ao mudar o valor do KWh
+    const kwhInput = document.getElementById('valor_kwh');
+    if (kwhInput) {
+        kwhInput.addEventListener('change', renderizarEquipamentos);
+        kwhInput.addEventListener('input', renderizarEquipamentos);
+    }
 }
 
 function adicionarEquipamento(event) {
@@ -410,17 +464,25 @@ function calcularCustoEquipamento(potenciaW, tempoTotalH, diasUsoM, valorKWh) {
 function renderizarEquipamentos() {
     const listaContainer = document.getElementById('equipamentos-list');
     const custoTotalSpan = document.getElementById('custo-total-energia');
+    const valorKWhInput = document.getElementById('valor_kwh');
 
-    if (!listaContainer || !custoTotalSpan) return; 
+    if (!listaContainer || !custoTotalSpan || !valorKWhInput) return; 
 
-    const valorKWh = parseFloat(document.getElementById('valor_kwh').value) || 0;
+    const valorKWh = parseFloat(valorKWhInput.value) || 0;
     let custoTotal = 0;
     let htmlContent = '';
+    let equipamentosCalculados = [];
 
     if (equipamentos.length === 0) {
         htmlContent = '<p class="placeholder-text">Nenhum equipamento adicionado.</p>';
         listaContainer.innerHTML = htmlContent;
         custoTotalSpan.textContent = `R$ 0.00`;
+        
+        lastEnergiaResults = {
+            valorKWh,
+            equipamentos: [],
+            custoTotal: 0
+        };
         return;
     }
 
@@ -444,7 +506,15 @@ function renderizarEquipamentos() {
                 </button>
             </div>
         `;
+        equipamentosCalculados.push(eq);
     });
+
+    // Salva o estado para o PDF
+    lastEnergiaResults = {
+        valorKWh,
+        equipamentos: equipamentosCalculados,
+        custoTotal: custoTotal
+    };
 
     listaContainer.innerHTML = htmlContent;
     custoTotalSpan.textContent = `R$ ${custoTotal.toFixed(2)}`;
@@ -452,17 +522,28 @@ function renderizarEquipamentos() {
 
 
 // ========================================================
-// 4. GADGET 3: CALCULADORA DE PRODUTIVIDADE (RENDERIZAÇÃO E LÓGICA)
+// 4. GADGET 3: CALCULADORA DE PRODUTIVIDADE (Mantido - Salva no estado)
 // ========================================================
 
 function renderProdutividade() {
     appContainer.innerHTML = `
         <section id="gadget-produtividade" class="gadget-screen active">
-            <h2>📈 Produtividade Pessoal & Balance Score</h2>
+            <h2>📈 Produtividade e Análise de Tempo</h2>
             <form id="form-produtividade">
+                
+                <h4>Dados Financeiros e Frequência</h4>
+                <div class="input-group">
+                    <label for="salario_mensal">Salário Mensal (R$):</label>
+                    <input type="number" id="salario_mensal" value="5000.00" step="0.01" required>
+                </div>
+                <div class="input-group">
+                    <label for="dias_uteis_semana">Dias Úteis na Semana:</label>
+                    <input type="number" id="dias_uteis_semana" value="5" min="1" max="7" required>
+                </div>
+
                 <h4>Tempo Gasto por Categoria (Horas Diárias)</h4>
                 <div class="input-group">
-                    <label for="horas_trabalho">1. Trabalho/Foco:</label>
+                    <label for="horas_trabalho">1. Trabalho/Foco (*Remunerado*):</label>
                     <input type="number" id="horas_trabalho" value="6" step="0.1" required>
                 </div>
                 <div class="input-group">
@@ -474,7 +555,7 @@ function renderProdutividade() {
                     <input type="number" id="tempo_lazer" value="3" step="0.1" required>
                 </div>
                 <div class="input-group">
-                    <label for="tempo_distracao">4. Distrações (Não-Planejado):</label>
+                    <label for="tempo_distracao">4. Distrações (Não-Produtivo):</label>
                     <input type="number" id="tempo_distracao" value="1.5" step="0.1" required>
                 </div>
                 <div class="input-group">
@@ -482,19 +563,29 @@ function renderProdutividade() {
                     <input type="number" id="tempo_deslocamento" value="1" step="0.1" required>
                 </div>
                 
-                <div class="input-group">
-                    <label for="salario_hora">Valor da Hora (R$/h - Opcional):</label>
-                    <input type="number" id="salario_hora" placeholder="Ex: 25.00" step="0.01">
-                </div>
                 <button type="submit" class="cta-button">Analisar Produtividade</button>
                 
-                <div class="result-box">
-                    <p>Produtividade Essencial (Trabalho/Estudo): <span id="taxa-eficiencia">0%</span></p>
-                    <p>Horas Perdidas com Distração: <span id="horas-perdidas">0.0h</span></p>
-                    <p>Custo da Distração Diária: <span id="custo-distracao">R$ 0.00</span></p>
+                <div class="result-box" id="prod-result-box">
+                    <p class="section-title">Análise Diária</p>
+                    <p>Custo da Hora: <span id="custo-hora">R$ 0.00</span></p>
+                    <p>Taxa de Eficiência (Foco/Foco+Distração): <span id="taxa-eficiencia">0%</span></p>
+                    <p>Custo Diário da Distração: <span id="custo-distracao">R$ 0.00</span></p>
+
+                    <p class="section-title">Análise Semanal</p>
+                    <p>Horas Perdidas na Semana: <span id="horas-perdidas-semana">0.0h</span></p>
+                    <p>Custo Semanal da Distração: <span id="custo-distracao-semanal">R$ 0.00</span></p>
+                    
                     <p class="insight-text" id="prod-insight">...</p>
                 </div>
             </form>
+            <div class="action-buttons-group">
+                <button type="button" class="cta-button small-button action-button" onclick="generatePdf('produtividade')">
+                    Baixar Relatório (PDF)
+                </button>
+                <button type="button" class="cta-button small-button secondary-button" onclick="shareContent('produtividade')">
+                    Compartilhar
+                </button>
+            </div>
         </section>
     `;
     attachProdutividadeListeners();
@@ -507,40 +598,57 @@ function attachProdutividadeListeners() {
 function analisarProdutividade(event) {
     event.preventDefault();
 
-    // Tratamento de float garantido pelo parseFloat()
+    // 1. Coleta de Dados
+    const salarioMensal = parseFloat(document.getElementById('salario_mensal').value) || 0;
+    const diasUteisSemana = parseInt(document.getElementById('dias_uteis_semana').value) || 5;
     const horasTrabalho = parseFloat(document.getElementById('horas_trabalho').value) || 0;
     const tempoEstudo = parseFloat(document.getElementById('tempo_estudo').value) || 0;
+    const tempoLazer = parseFloat(document.getElementById('tempo_lazer').value) || 0;
     const tempoDistracao = parseFloat(document.getElementById('tempo_distracao').value) || 0;
-    const salarioHora = parseFloat(document.getElementById('salario_hora').value) || 0;
-
+    const tempoDeslocamento = parseFloat(document.getElementById('tempo_deslocamento').value) || 0;
+    
+    // 2. Cálculos de Base
+    const horasUteisMes = 4.3 * diasUteisSemana * horasTrabalho; // 4.3 semanas em um mês
+    const custoHora = horasUteisMes > 0 ? salarioMensal / horasUteisMes : 0;
+    
+    // 3. Métricas Diárias
     const horasTotaisFoco = horasTrabalho + tempoEstudo;
+    const baseEficiencia = horasTotaisFoco + tempoDistracao;
+    const taxaEficiencia = baseEficiencia > 0 ? (horasTotaisFoco / baseEficiencia) * 100 : 0;
+    const custoDistracaoDiario = tempoDistracao * custoHora;
 
-    if (horasTotaisFoco + tempoDistracao === 0) {
-        document.getElementById('prod-insight').textContent = "Insira valores de tempo válidos para análise.";
-        return;
-    }
+    // 4. Métricas Semanais
+    const horasPerdidasSemana = tempoDistracao * diasUteisSemana;
+    const custoDistracaoSemanal = custoDistracaoDiario * diasUteisSemana;
 
-    const taxaEficiencia = (horasTotaisFoco / (horasTotaisFoco + tempoDistracao)) * 100;
-    const custoDistracao = tempoDistracao * salarioHora;
-
+    // 5. Insights
     let insight = "";
-    if (taxaEficiencia >= 70) {
-        insight = `Ótimo! Sua eficiência é alta (${taxaEficiencia.toFixed(1)}%). Acima de 70% eleva suas chances de sucesso a longo prazo.`;
+    if (taxaEficiencia >= 75) {
+        insight = `Ótimo! Sua eficiência é alta (${taxaEficiencia.toFixed(1)}%). Seu foco está sendo recompensado.`;
     } else if (taxaEficiencia >= 50) {
-        insight = `Bom. Sua eficiência está em ${taxaEficiencia.toFixed(1)}%. Com menos ${tempoDistracao.toFixed(1)} horas de distração você pode atingir o nível ótimo.`;
+        insight = `Bom. Sua eficiência está em ${taxaEficiencia.toFixed(1)}%. Tente reduzir as ${tempoDistracao.toFixed(1)} horas de distração para melhorar.`;
     } else {
-        insight = `Atenção. Sua eficiência está abaixo de 50%. Foque em reduzir as ${tempoDistracao.toFixed(1)} horas de distração para melhorar seus resultados.`;
+        insight = `Alerta! Sua eficiência está baixa. O custo semanal de R$ ${custoDistracaoSemanal.toFixed(2)} por distração é significativo. Priorize o Foco.`;
     }
 
+    // 6. Atualiza o DOM
+    document.getElementById('custo-hora').textContent = `R$ ${custoHora.toFixed(2)}`;
     document.getElementById('taxa-eficiencia').textContent = `${taxaEficiencia.toFixed(1)}%`;
-    document.getElementById('horas-perdidas').textContent = `${tempoDistracao.toFixed(1)}h`;
-    document.getElementById('custo-distracao').textContent = `R$ ${custoDistracao.toFixed(2)}`;
+    document.getElementById('custo-distracao').textContent = `R$ ${custoDistracaoDiario.toFixed(2)}`;
+    document.getElementById('horas-perdidas-semana').textContent = `${horasPerdidasSemana.toFixed(1)}h`;
+    document.getElementById('custo-distracao-semanal').textContent = `R$ ${custoDistracaoSemanal.toFixed(2)}`;
     document.getElementById('prod-insight').textContent = insight;
+
+    // 7. Salva resultados para o PDF
+    lastProdutividadeResults = {
+        salarioMensal, diasUteisSemana, horasTrabalho, tempoEstudo, tempoLazer, tempoDistracao, tempoDeslocamento,
+        custoHora, taxaEficiencia, custoDistracaoDiario, horasPerdidasSemana, custoDistracaoSemanal, insight
+    };
 }
 
 
 // ========================================================
-// 5. GADGET 4: GERADOR DE DOCUMENTOS (RENDERIZAÇÃO E LÓGICA)
+// 5. GADGET 4: GERADOR DE DOCUMENTOS (Cálculos atualizados para estado)
 // ========================================================
 
 function renderDocumentos() {
@@ -605,10 +713,15 @@ function renderDocumentos() {
                 </div>
 
                 <button type="submit" class="cta-button">Gerar Documento</button>
-                <button type="button" class="cta-button small-button action-button" onclick="generatePdf('documentos')">
-                    Baixar/Compartilhar (PDF)
-                </button>
             </form>
+            <div class="action-buttons-group">
+                <button type="button" class="cta-button small-button action-button" onclick="generatePdf('documentos')">
+                    Baixar (PDF)
+                </button>
+                <button type="button" class="cta-button small-button secondary-button" onclick="shareContent('documentos')">
+                    Compartilhar
+                </button>
+            </div>
         </section>
     `;
     attachDocumentosListeners();
@@ -618,7 +731,6 @@ function renderDocumentos() {
 function attachDocumentosListeners() {
     const formDocumentos = document.getElementById('form-documentos');
     if (formDocumentos) {
-        // O evento de submit só deve gerar o PDF se a submissão for válida
         formDocumentos.addEventListener('submit', gerarDocumento);
     }
 }
@@ -642,7 +754,6 @@ function setDocType(type) {
 
 function adicionarItemDoc() {
     const descricao = document.getElementById('item_descricao').value.trim();
-    // Tratamento de float garantido pelo parseFloat()
     const quantidade = parseFloat(document.getElementById('item_quantidade').value) || 0;
     const valorUnitario = parseFloat(document.getElementById('item_valor').value) || 0;
 
@@ -705,6 +816,18 @@ function renderizarItensDoc() {
         });
     }
 
+    // Salva o estado para o PDF
+    lastDocumentosData = {
+        empresa: document.getElementById('doc_empresa')?.value || '',
+        cnpj: document.getElementById('doc_cnpj')?.value || '',
+        telefone: document.getElementById('doc_telefone')?.value || '',
+        email: document.getElementById('doc_email')?.value || '',
+        infoExtra: document.getElementById('doc_info_extra')?.value || '',
+        docType: docType,
+        itens: docItens,
+        valorTotal: valorTotalDoc
+    };
+
     listaContainer.innerHTML = htmlContent;
     valorTotalSpan.textContent = `R$ ${valorTotalDoc.toFixed(2)}`;
 }
@@ -714,6 +837,10 @@ function gerarDocumento(event) {
 
     const empresa = document.getElementById('doc_empresa').value.trim();
     const cnpj = document.getElementById('doc_cnpj').value.trim();
+    
+    // Atualiza o estado da empresa/emissor, pois eles não são atualizados em renderizarItensDoc()
+    lastDocumentosData.empresa = empresa;
+    lastDocumentosData.cnpj = cnpj;
     
     if (!empresa || !cnpj || docItens.length === 0) {
         alert(`Por favor, preencha os dados da empresa e adicione pelo menos um item para gerar o(a) ${docType}.`);
@@ -726,91 +853,472 @@ function gerarDocumento(event) {
 
 
 // ========================================================
-// 6. FUNÇÕES DE AÇÃO GERAL (PDF/Compartilhar) - REAIS
+// 6. FUNÇÕES DE AÇÃO GERAL (PDF/Compartilhar) - GERAÇÃO PROGRAMÁTICA PARA TODOS
 // ========================================================
 
 /**
- * Função real para gerar e baixar um relatório em PDF usando html2canvas e jsPDF.
- * @param {string} gadgetId - O ID do gadget (viagem, energia, documentos).
+ * Função para gerar PDF (router principal).
+ * Chama a função de layout programático específica para cada gadget.
+ * @param {string} gadgetId - O ID do gadget.
  */
 function generatePdf(gadgetId) {
-    const content = document.querySelector(`#gadget-${gadgetId}`);
-    
-    if (!content || !window.html2canvas || !window.jspdf) {
-        alert("Erro: Conteúdo não encontrado ou bibliotecas jsPDF/html2canvas não carregadas.");
+    switch (gadgetId) {
+        case 'viagem':
+            generateViagemPdf();
+            break;
+        case 'energia':
+            generateEnergiaPdf();
+            break;
+        case 'produtividade':
+            generateProdutividadePdf();
+            break;
+        case 'documentos':
+            generateDocumentosPdf();
+            break;
+        default:
+            alert("Gadget não encontrado ou sem função de PDF profissional implementada.");
+    }
+}
+
+// ----------------------------------------------------
+// IMPLEMENTAÇÃO DE PDF PROGRAMÁTICO (PRODUTIVIDADE) - Reutilizado
+// ----------------------------------------------------
+
+function generateProdutividadePdf() {
+    if (!lastProdutividadeResults || Object.keys(lastProdutividadeResults).length === 0) {
+        alert("Por favor, clique em 'Analisar Produtividade' antes de gerar o relatório.");
         return;
     }
 
-    // 1. Definição do título do documento
-    let title;
-    let fileName;
+    const data = lastProdutividadeResults;
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('p', 'mm', 'a4'); // A4, em milímetros (210x297)
 
-    if (gadgetId === 'documentos') {
-        title = getDocTitle(docType).toUpperCase();
-        fileName = title.replace(/\s/g, '_') + '_' + Date.now();
-    } else {
-        title = gadgetId === 'viagem' ? 'RELATÓRIO DE CUSTO DE VIAGEM' : 'RELATÓRIO DE CONSUMO DE ENERGIA';
-        fileName = title.replace(/\s/g, '_');
+    let y = 20;
+    const margin = 15;
+    const lineSpacing = 8;
+    
+    // Título
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(20);
+    pdf.text("Relatório de Produtividade e Análise de Valor", margin, y);
+    y += 15;
+
+    // Linha Divisória
+    pdf.setLineWidth(0.5);
+    pdf.line(margin, y, 195, y); 
+    y += 10;
+
+    // Informações Chave
+    pdf.setFontSize(14);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text("Parâmetros Financeiros", margin, y);
+    y += lineSpacing;
+
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(12);
+    pdf.text(`Salário Mensal Estimado: R$ ${data.salarioMensal.toFixed(2)}`, margin, y);
+    pdf.text(`Dias Úteis/Semana: ${data.diasUteisSemana}`, 110, y);
+    y += lineSpacing;
+    pdf.text(`Custo Estimado da Hora de Trabalho: R$ ${data.custoHora.toFixed(2)}`, margin, y);
+    y += 15;
+
+    // Tabela de Tempo
+    pdf.setFont('helvetica', 'bold');
+    pdf.text("Distribuição do Tempo Diário (Horas)", margin, y);
+    y += lineSpacing;
+
+    const headers = [["Categoria", "Horas Diárias"]];
+    const body = [
+        ["Trabalho/Foco (Produtivo)", `${data.horasTrabalho.toFixed(1)}h`],
+        ["Estudo/Desenvolvimento (Produtivo)", `${data.tempoEstudo.toFixed(1)}h`],
+        ["Lazer/Pessoal (Essencial)", `${data.tempoLazer.toFixed(1)}h`],
+        ["Deslocamento/Trânsito (Necessário)", `${data.tempoDeslocamento.toFixed(1)}h`],
+        ["Distrações (Não-Produtivo)", `${data.tempoDistracao.toFixed(1)}h`],
+    ];
+
+    pdf.autoTable({
+        startY: y,
+        head: headers,
+        body: body,
+        theme: 'striped',
+        styles: { fontSize: 10, font: 'helvetica' },
+        headStyles: { fillColor: [44, 62, 80], textColor: 255 }, 
+        margin: { left: margin, right: 15 }
+    });
+
+    y = pdf.autoTable.previous.finalY + 10; 
+
+    // Resultados da Análise
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(14);
+    pdf.text("Análise de Produtividade e Impacto Financeiro", margin, y);
+    y += lineSpacing;
+
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(12);
+    pdf.text(`Taxa de Eficiência (Diária): ${data.taxaEficiencia.toFixed(1)}%`, margin, y);
+    y += lineSpacing;
+    pdf.text(`Horas Perdidas na Semana por Distração: ${data.horasPerdidasSemana.toFixed(1)}h`, margin, y);
+    y += lineSpacing;
+    
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(192, 57, 43); 
+    pdf.text(`Custo Semanal da Distração: R$ ${data.custoDistracaoSemanal.toFixed(2)}`, margin, y);
+    pdf.setTextColor(0); 
+    y += lineSpacing + 5;
+
+    // Insight
+    pdf.setFont('helvetica', 'bold');
+    pdf.text("Insight:", margin, y);
+    pdf.setFont('helvetica', 'normal');
+    y += lineSpacing;
+    pdf.text(pdf.splitTextToSize(data.insight, 170), margin, y); 
+
+    // Rodapé
+    pdf.setFontSize(8);
+    pdf.text("Gerado por Smart Hub - Dev Web em " + new Date().toLocaleDateString('pt-BR'), 10, 290);
+    
+    pdf.save("Relatorio_Produtividade_Profissional.pdf");
+}
+
+
+// ----------------------------------------------------
+// IMPLEMENTAÇÃO DE PDF PROGRAMÁTICO (VIAGEM) - NOVO
+// ----------------------------------------------------
+
+function generateViagemPdf() {
+    if (!lastViagemResults || Object.keys(lastViagemResults).length === 0) {
+        alert("Por favor, calcule os custos de viagem antes de gerar o relatório.");
+        return;
+    }
+    const data = lastViagemResults;
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    
+    let y = 20;
+    const margin = 15;
+    const lineSpacing = 8;
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(20);
+    const title = data.model === 'avancado' ? "Relatório TCO (Custo Total de Propriedade) da Viagem" : "Relatório Básico de Custo de Viagem";
+    pdf.text(title, margin, y);
+    y += 15;
+    pdf.setLineWidth(0.5);
+    pdf.line(margin, y, 195, y); 
+    y += 10;
+
+    // Dados Principais
+    pdf.setFontSize(14);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text("Dados da Viagem", margin, y);
+    y += lineSpacing;
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(12);
+    pdf.text(`Distância: ${data.distancia.toFixed(0)} Km`, margin, y);
+    pdf.text(`Consumo Médio: ${data.consumoMedio.toFixed(2)} Km/L`, 110, y);
+    y += lineSpacing;
+    pdf.text(`Preço do Combustível: R$ ${data.precoCombustivel.toFixed(2)}/L`, margin, y);
+    y += 15;
+
+    // Resultados de Combustível
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(14);
+    pdf.text("Cálculo de Combustível", margin, y);
+    y += lineSpacing;
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(12);
+    
+    const bodyCombustivel = [
+        ["Litros Gastos", `${data.litrosGasto.toFixed(2)} L`],
+        ["Custo Total do Combustível", `R$ ${data.custoTotalCombustivel ? data.custoTotalCombustivel.toFixed(2) : data.custoTotal.toFixed(2)}`],
+    ];
+    
+    pdf.autoTable({
+        startY: y,
+        head: [['Métrica', 'Valor']],
+        body: bodyCombustivel,
+        theme: 'grid',
+        styles: { fontSize: 10, font: 'helvetica' },
+        headStyles: { fillColor: [44, 62, 80], textColor: 255 },
+        margin: { left: margin, right: 15 }
+    });
+    y = pdf.autoTable.previous.finalY + 10;
+    
+    // Modelo Avançado (TCO)
+    if (data.model === 'avancado') {
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(14);
+        pdf.text("Cálculo de TCO (Custos Adicionais)", margin, y);
+        y += lineSpacing;
+
+        const bodyTCO = [];
+        bodyTCO.push(["Pedágios/Taxas", `R$ ${data.pedagios.toFixed(2)}`]);
+        bodyTCO.push(["Custo de Manutenção (Óleo/Pneu)", `R$ ${data.custoManutencao.custoTotalManutencaoViagem.toFixed(2)}`]);
+        
+        if (data.custoExtras.diaria) {
+            bodyTCO.push(["Diárias/Alimentação", `R$ ${data.custoExtras.diaria.custo.toFixed(2)}`]);
+        }
+        if (data.custoExtras.arla) {
+            bodyTCO.push(["Custo ARLA 32", `R$ ${data.custoExtras.arla.custo.toFixed(2)}`]);
+        }
+
+        pdf.autoTable({
+            startY: y,
+            head: [['Descrição', 'Custo']],
+            body: bodyTCO,
+            theme: 'striped',
+            styles: { fontSize: 10, font: 'helvetica' },
+            headStyles: { fillColor: [243, 156, 18], textColor: 0 }, // Laranja
+            margin: { left: margin, right: 15 }
+        });
+        y = pdf.autoTable.previous.finalY + 10;
     }
 
-    // 2. Transforma o HTML em uma imagem (Canvas)
-    html2canvas(content, { 
-        scale: 2, 
-        useCORS: true 
-    }).then(canvas => {
-        const { jsPDF } = window.jspdf;
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        const imgData = canvas.toDataURL('image/png');
-        
-        const pdfWidth = 210;
-        const pdfHeight = 297; 
+    // Custo Total Final
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(16);
+    pdf.text("CUSTO TOTAL DA VIAGEM:", margin, y);
+    pdf.setTextColor(46, 204, 113); // Verde
+    pdf.text(`R$ ${data.custoTotal.toFixed(2)}`, 110, y);
+    pdf.setTextColor(0); // Volta ao preto
+    y += lineSpacing;
+    
+    // Rodapé
+    pdf.setFontSize(8);
+    pdf.text("Gerado por Smart Hub - Dev Web em " + new Date().toLocaleDateString('pt-BR'), 10, 290);
 
-        const imgWidth = pdfWidth - 20; 
-        const imgHeight = (canvas.height * imgWidth) / canvas.width;
-        
-        let position = 10; 
+    pdf.save(`Relatorio_Viagem_${data.model.toUpperCase()}.pdf`);
+}
 
-        pdf.setFontSize(18);
-        pdf.text(title, 10, position);
-        position += 10;
 
-        let heightLeft = imgHeight;
+// ----------------------------------------------------
+// IMPLEMENTAÇÃO DE PDF PROGRAMÁTICO (ENERGIA) - NOVO
+// ----------------------------------------------------
 
-        while (heightLeft >= 0) {
-            let pageHeight = pdfHeight - 20; 
-            let currentCanvasHeight = Math.min(heightLeft, pageHeight);
+function generateEnergiaPdf() {
+    if (!lastEnergiaResults || lastEnergiaResults.equipamentos?.length === 0) {
+        alert("Por favor, adicione e calcule o custo de pelo menos um equipamento.");
+        return;
+    }
+    const data = lastEnergiaResults;
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    
+    let y = 20;
+    const margin = 15;
+    const lineSpacing = 8;
 
-            // Ajuste na posição Y para renderizar o pedaço correto do canvas
-            const sHeight = (imgHeight - heightLeft);
-            
-            pdf.addImage(imgData, 'PNG', 10, position, imgWidth, currentCanvasHeight, undefined, 'FAST', 0, -sHeight);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(20);
+    pdf.text("Relatório de Consumo de Energia Mensal", margin, y);
+    y += 15;
+    pdf.setLineWidth(0.5);
+    pdf.line(margin, y, 195, y); 
+    y += 10;
 
-            heightLeft -= pageHeight;
-            position = 10;
+    // Dados de Entrada
+    pdf.setFontSize(14);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text("Parâmetros", margin, y);
+    y += lineSpacing;
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(12);
+    pdf.text(`Valor do kW/h: R$ ${data.valorKWh.toFixed(3)}`, margin, y);
+    y += 10;
+    
+    // Tabela de Equipamentos
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(14);
+    pdf.text("Detalhamento por Equipamento", margin, y);
+    y += lineSpacing;
 
-            if (heightLeft > -1) {
-                pdf.addPage();
-            }
-        }
-        
-        // 4. Salva o PDF
-        pdf.save(`${fileName}.pdf`);
+    const headers = [["Equipamento", "Potência (W)", "Uso Diário (h)", "Dias/Mês", "Custo Mensal (R$)"]];
+    const body = data.equipamentos.map(eq => {
+        return [
+            eq.nome,
+            `${eq.potencia} W`,
+            `${eq.tempoTotalH.toFixed(1)} h`,
+            `${eq.diasUso}`,
+            `R$ ${eq.custo.toFixed(2)}`
+        ];
     });
+
+    pdf.autoTable({
+        startY: y,
+        head: headers,
+        body: body,
+        theme: 'striped',
+        styles: { fontSize: 10, font: 'helvetica', cellWidth: 'wrap' },
+        headStyles: { fillColor: [52, 152, 219], textColor: 255 }, // Azul
+        margin: { left: margin, right: 15 }
+    });
+    y = pdf.autoTable.previous.finalY + 10;
+
+    // Custo Total Final
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(16);
+    pdf.text("CUSTO TOTAL MENSAL ESTIMADO:", margin, y);
+    pdf.setTextColor(46, 204, 113); // Verde
+    pdf.text(`R$ ${data.custoTotal.toFixed(2)}`, 110, y);
+    pdf.setTextColor(0); // Volta ao preto
+    y += lineSpacing;
+    
+    // Rodapé
+    pdf.setFontSize(8);
+    pdf.text("Gerado por Smart Hub - Dev Web em " + new Date().toLocaleDateString('pt-BR'), 10, 290);
+
+    pdf.save("Relatorio_Consumo_Energia.pdf");
+}
+
+
+// ----------------------------------------------------
+// IMPLEMENTAÇÃO DE PDF PROGRAMÁTICO (DOCUMENTOS) - NOVO
+// ----------------------------------------------------
+
+function generateDocumentosPdf() {
+    if (!lastDocumentosData || lastDocumentosData.itens?.length === 0) {
+        alert("Preencha os dados da empresa e adicione pelo menos um item para gerar o documento.");
+        return;
+    }
+    const data = lastDocumentosData;
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('p', 'mm', 'a4');
+
+    let y = 20;
+    const margin = 15;
+    const lineSpacing = 7;
+    
+    // Título Principal (OS, Orçamento ou Nota)
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(22);
+    pdf.setTextColor(44, 62, 80);
+    pdf.text(getDocTitle(data.docType).toUpperCase(), margin, y);
+    y += 10;
+
+    // Dados do Emissor (Caixa de Informações)
+    pdf.setLineWidth(0.2);
+    pdf.rect(margin, y, 180, 25); // Desenha a caixa
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(0);
+    pdf.text("EMITENTE:", margin + 2, y + 4);
+    
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(`Empresa: ${data.empresa}`, margin + 2, y + 8);
+    pdf.text(`CNPJ/CPF: ${data.cnpj}`, margin + 2, y + 12);
+    pdf.text(`Tel: ${data.telefone}`, margin + 2, y + 16);
+    pdf.text(`Email: ${data.email}`, margin + 2, y + 20);
+    y += 35;
+
+    // Tabela de Itens
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(14);
+    pdf.text(getDocItemsTitle(data.docType), margin, y);
+    y += lineSpacing;
+
+    const headers = [["Descrição", "Qtd", "V. Unitário (R$)", "V. Total (R$)"]];
+    const body = data.itens.map(item => {
+        return [
+            item.descricao,
+            `${item.quantidade}`,
+            `R$ ${item.valorUnitario.toFixed(2)}`,
+            `R$ ${item.valorTotal.toFixed(2)}`
+        ];
+    });
+
+    pdf.autoTable({
+        startY: y,
+        head: headers,
+        body: body,
+        theme: 'grid',
+        styles: { fontSize: 10, font: 'helvetica', cellWidth: 'wrap' },
+        headStyles: { fillColor: [44, 62, 80], textColor: 255 },
+        margin: { left: margin, right: 15 }
+    });
+    y = pdf.autoTable.previous.finalY + 10;
+    
+    // Valor Total
+    pdf.setDrawColor(46, 204, 113); // Borda verde
+    pdf.setLineWidth(0.8);
+    pdf.rect(140, y, 55, 10);
+    
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(14);
+    pdf.setTextColor(44, 62, 80);
+    pdf.text("VALOR TOTAL:", 142, y + 7);
+    pdf.setTextColor(46, 204, 113); // Verde
+    pdf.text(`R$ ${data.valorTotal.toFixed(2)}`, 180, y + 7, { align: "right" });
+    pdf.setTextColor(0);
+    y += 15;
+
+    // Observações
+    if (data.infoExtra) {
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(12);
+        pdf.text("Observações/Condições:", margin, y);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(10);
+        y += lineSpacing;
+        const textLines = pdf.splitTextToSize(data.infoExtra, 180);
+        pdf.text(textLines, margin, y);
+        y += textLines.length * 4 + 10;
+    }
+    
+    // Assinaturas (Simulação)
+    pdf.line(margin + 5, 270, 95, 270);
+    pdf.text("Assinatura do Emissor", margin + 10, 274);
+    
+    pdf.line(115, 270, 185, 270);
+    pdf.text("Assinatura do Cliente", 125, 274);
+    
+    // Rodapé
+    pdf.setFontSize(8);
+    pdf.text("Documento gerado por Smart Hub - Dev Web em " + new Date().toLocaleDateString('pt-BR'), 10, 290);
+
+    pdf.save(`${getDocTitle(data.docType).replace(/\s/g, '_')}_${Date.now()}.pdf`);
+}
+
+
+// ----------------------------------------------------
+// FUNÇÃO DE COMPARTILHAMENTO (Mantido)
+// ----------------------------------------------------
+
+function shareContent(gadgetId) {
+    const titleMap = {
+        'viagem': 'Relatório de Custo de Viagem',
+        'energia': 'Relatório de Consumo de Energia',
+        'produtividade': 'Relatório de Produtividade e Foco',
+        'documentos': getDocTitle(docType)
+    };
+    
+    const title = titleMap[gadgetId] || 'Relatório Smart Hub';
+    
+    if (navigator.share) {
+        navigator.share({
+            title: title,
+            text: `Confira a análise gerada pelo Smart Hub: ${title}.`,
+            url: window.location.href 
+        }).catch((error) => {
+            alert(`[Ação Simulado] Compartilhamento de ${title} pronto! Use a função nativa do seu dispositivo.`);
+        });
+    } else {
+        alert(`[Ação Simulado] Compartilhamento de ${title} pronto! (URL: ${window.location.href}). Clique em Baixar para obter o PDF.`);
+    }
 }
 
 
 // ========================================================
-// 7. INICIALIZAÇÃO DA APLICAÇÃO
+// 7. INICIALIZAÇÃO DA APLICAÇÃO (Mantido)
 // ========================================================
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Adiciona listener nos botões de navegação para chamar o Router
     document.querySelectorAll('.app-nav .nav-item').forEach(button => {
         button.addEventListener('click', () => {
             showGadget(button.getAttribute('data-gadget-id'));
         });
     });
 
-    // Inicia a aplicação no primeiro gadget ('viagem')
     showGadget('viagem');
 });
