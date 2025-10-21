@@ -1,5 +1,5 @@
 // ========================================================
-// RECURSOS GLOBAIS
+// RECURSOS GLOBAIS E ESTADOS
 // ========================================================
 
 const appContainer = document.getElementById('app-content-container');
@@ -11,9 +11,6 @@ let docType = 'OS';    // Estado global para o tipo de Documento
 // 1. O ROUTER E NAVEGAÇÃO
 // ========================================================
 
-/**
- * Funções de renderização para cada gadget (definidas abaixo)
- */
 const gadgetRenderers = {
     'viagem': renderViagem,
     'energia': renderEnergia,
@@ -22,36 +19,28 @@ const gadgetRenderers = {
 };
 
 /**
- * Função principal de navegação (Substitui showGadget)
- * @param {string} gadgetId - O ID do gadget a ser renderizado.
+ * Função principal de navegação (Router)
  */
 function showGadget(gadgetId) {
-    // 1. Limpa o container principal
     appContainer.innerHTML = '';
     
-    // 2. Renderiza o HTML do gadget
     if (gadgetRenderers[gadgetId]) {
         gadgetRenderers[gadgetId]();
     } else {
         appContainer.innerHTML = `<section class="gadget-screen"><h2>Em Desenvolvimento</h2><p>O gadget ${gadgetId} está sendo construído!</p></section>`;
     }
 
-    // 3. Atualiza o estado 'active' na barra de navegação
     document.querySelectorAll('.app-nav .nav-item').forEach(item => {
         item.classList.remove('active');
         if (item.getAttribute('data-gadget-id') === gadgetId) {
             item.classList.add('active');
         }
     });
-
-    // 4. Se o gadget for 'viagem', garante que o modelo básico seja inicializado
-    if (gadgetId === 'viagem') {
-        showViagemModel('basico');
-    }
 }
 
+
 // ========================================================
-// 2. GADGET 1: CALCULADORA DE VIAGEM (RENDERIZAÇÃO)
+// 2. GADGET 1: CALCULADORA DE VIAGEM (RENDERIZAÇÃO E LÓGICA)
 // ========================================================
 
 function renderViagem() {
@@ -59,8 +48,8 @@ function renderViagem() {
         <section id="gadget-viagem" class="gadget-screen active">
             <h2>🚗 Calculadora de Viagem</h2>
             <div class="segment-control">
-                <button class="active" onclick="showViagemModel('basico')">Básico</button>
-                <button onclick="showViagemModel('avancado')">Avançado</button>
+                <button class="active" data-model="basico" onclick="showViagemModel('basico')">Básico</button>
+                <button data-model="avancado" onclick="showViagemModel('avancado')">Avançado</button>
             </div>
 
             <div id="viagem-basico" class="model-content active">
@@ -106,11 +95,11 @@ function renderViagem() {
                     
                     <h4>Variáveis Opcionais</h4>
                     <div class="checkbox-group">
-                        <input type="checkbox" id="check_pesado" onchange="toggleHeavyVehicleFields()">
+                        <input type="checkbox" id="check_pesado">
                         <label for="check_pesado">Veículo Pesado (Adicionar Arla)</label>
                     </div>
                     <div class="checkbox-group">
-                        <input type="checkbox" id="check_diarias" onchange="toggleDriverDailyFields()">
+                        <input type="checkbox" id="check_diarias">
                         <label for="check_diarias">Diárias do Motorista/Alimentação</label>
                     </div>
                     <div class="input-group">
@@ -178,19 +167,64 @@ function renderViagem() {
     attachViagemListeners();
 }
 
-
-// --------------------------------------------------------
-// Lógica de Viagem (Mantida)
-// --------------------------------------------------------
-
+/**
+ * Anexa todos os listeners de formulário e checkbox, resolvendo o problema de submissão.
+ */
 function attachViagemListeners() {
-    document.getElementById('form-viagem-basico').addEventListener('submit', calcularViagemBasico);
-    document.getElementById('form-viagem-avancado').addEventListener('submit', calcularViagemAvancado);
+    // Listeners de Cálculo
+    const formBasico = document.getElementById('form-viagem-basico');
+    const formAvancado = document.getElementById('form-viagem-avancado');
+
+    if (formBasico) formBasico.addEventListener('submit', calcularViagemBasico);
+    if (formAvancado) formAvancado.addEventListener('submit', calcularViagemAvancado);
+
+    // Listeners de Checkbox para mostrar/esconder campos
+    const checkPesado = document.getElementById('check_pesado');
+    const checkDiarias = document.getElementById('check_diarias');
+    
+    if (checkPesado) checkPesado.addEventListener('change', toggleHeavyVehicleFields);
+    if (checkDiarias) checkDiarias.addEventListener('change', toggleDriverDailyFields);
+
+    // Garante que o modelo inicial seja o Básico
+    showViagemModel('basico');
 }
 
+/**
+ * Funções auxiliares para mostrar/esconder campos opcionais na Viagem.
+ */
+function toggleHeavyVehicleFields() {
+    const isChecked = document.getElementById('check_pesado').checked;
+    document.getElementById('fields_pesado').classList.toggle('hidden', !isChecked);
+}
+
+function toggleDriverDailyFields() {
+    const isChecked = document.getElementById('check_diarias').checked;
+    document.getElementById('fields_diarias').classList.toggle('hidden', !isChecked);
+}
+
+function showViagemModel(model) {
+    const basico = document.getElementById('viagem-basico');
+    const avancado = document.getElementById('viagem-avancado');
+    const buttons = document.querySelectorAll('#gadget-viagem .segment-control button');
+
+    if (!basico || !avancado) return; // Garante que estamos na tela correta
+
+    buttons.forEach(btn => btn.classList.remove('active'));
+    document.querySelector(`#gadget-viagem .segment-control button[data-model="${model}"]`).classList.add('active');
+    
+    if (model === 'basico') {
+        basico.classList.remove('hidden');
+        avancado.classList.add('hidden');
+    } else {
+        basico.classList.add('hidden');
+        avancado.classList.remove('hidden');
+    }
+}
+
+// Lógica de Cálculo de Viagem (Mantida)
 function calcularViagemBasico(event) {
     event.preventDefault(); 
-    // Lógica BÁSICA
+    // ... lógica de cálculo básico ...
     const precoCombustivel = parseFloat(document.getElementById('combustivel').value);
     const consumoMedio = parseFloat(document.getElementById('consumo').value);
     const distancia = parseFloat(document.getElementById('distancia').value);
@@ -210,10 +244,13 @@ function calcularViagemBasico(event) {
 function calcularViagemAvancado(event) {
     event.preventDefault(); 
 
+    // Variáveis de Entrada Comuns
     const precoCombustivel = parseFloat(document.getElementById('combustivel_av').value);
     const consumoMedio = parseFloat(document.getElementById('consumo_av').value);
     const distancia = parseFloat(document.getElementById('distancia_av').value);
     const pedagios = parseFloat(document.getElementById('pedagios').value);
+    
+    // Variáveis de Manutenção
     const custoPneu = parseFloat(document.getElementById('custo_pneu').value);
     const kmPneu = parseFloat(document.getElementById('km_pneu').value);
     const custoOleo = parseFloat(document.getElementById('custo_oleo').value);
@@ -237,10 +274,10 @@ function calcularViagemAvancado(event) {
 
     // ARLA
     if (document.getElementById('check_pesado') && document.getElementById('check_pesado').checked) {
-        const consumoArla = parseFloat(document.getElementById('consumo_arla').value);
-        const precoArla = parseFloat(document.getElementById('preco_arla').value);
+        const consumoArla = parseFloat(document.getElementById('consumo_arla').value) || 0;
+        const precoArla = parseFloat(document.getElementById('preco_arla').value) || 0;
 
-        if (!isNaN(consumoArla) && !isNaN(precoArla) && distancia > 0) {
+        if (distancia > 0 && consumoArla > 0 && precoArla > 0) {
             const litrosArla = (distancia / 100) * consumoArla;
             custoExtras += litrosArla * precoArla;
         }
@@ -248,10 +285,10 @@ function calcularViagemAvancado(event) {
 
     // DIÁRIAS
     if (document.getElementById('check_diarias') && document.getElementById('check_diarias').checked) {
-        const diasViagem = parseFloat(document.getElementById('dias_viagem').value);
-        const custoDiaria = parseFloat(document.getElementById('custo_diaria').value);
+        const diasViagem = parseFloat(document.getElementById('dias_viagem').value) || 0;
+        const custoDiaria = parseFloat(document.getElementById('custo_diaria').value) || 0;
         
-        if (!isNaN(diasViagem) && !isNaN(custoDiaria)) {
+        if (diasViagem > 0 && custoDiaria > 0) {
             custoExtras += diasViagem * custoDiaria;
         }
     }
@@ -265,12 +302,12 @@ function calcularViagemAvancado(event) {
     document.getElementById('custo-total-av').textContent = `R$ ${custoTotalAvancado.toFixed(2)}`;
 }
 
+
 // ========================================================
-// 3. GADGET 2: CALCULADORA DE ENERGIA (RENDERIZAÇÃO)
+// 3. GADGET 2: CALCULADORA DE ENERGIA (RENDERIZAÇÃO E LÓGICA)
 // ========================================================
 
 function renderEnergia() {
-    // Nota: O estado 'equipamentos' é global e persistirá entre as trocas de gadget.
     appContainer.innerHTML = `
         <section id="gadget-energia" class="gadget-screen active">
             <h2>⚡ Calculadora de Gastos de Energia</h2>
@@ -317,20 +354,18 @@ function renderEnergia() {
             </button>
         </section>
     `;
-    // Anexa Listeners e renderiza a lista inicial
     attachEnergiaListeners();
     renderizarEquipamentos(); 
 }
 
-// --------------------------------------------------------
-// Lógica de Energia (Mantida e Ajustada para renderização dinâmica)
-// --------------------------------------------------------
-
 function attachEnergiaListeners() {
     document.getElementById('form-novo-equipamento').addEventListener('submit', adicionarEquipamento);
+    // Recalcula a lista e total sempre que o valor do kWh é alterado
     document.getElementById('valor_kwh').addEventListener('change', renderizarEquipamentos);
     document.getElementById('valor_kwh').addEventListener('input', renderizarEquipamentos); 
 }
+
+// ... Lógica de Energia (Adicionar, Remover, Calcular, Renderizar) ...
 
 function adicionarEquipamento(event) {
     event.preventDefault();
@@ -343,7 +378,7 @@ function adicionarEquipamento(event) {
 
     const tempoTotalH = tempoH + (tempoMin / 60);
 
-    if (!nome || isNaN(potencia) || isNaN(tempoTotalH) || isNaN(dias) || potencia <= 0 || tempoTotalH <= 0 || dias <= 0) {
+    if (!nome || isNaN(potencia) || isNaN(tempoTotalH) || isNaN(dias) || potencia <= 0 || (tempoTotalH <= 0 && tempoMin == 0 && tempoH == 0) || dias <= 0) {
         alert("Preencha os campos com valores válidos. O tempo de uso deve ser maior que zero.");
         return;
     }
@@ -373,10 +408,11 @@ function calcularCustoEquipamento(potenciaW, tempoTotalH, diasUsoM, valorKWh) {
     return consumoKWh * valorKWh;
 }
 
-// A função renderizarEquipamentos deve ser global para ser chamada pelo JS
 function renderizarEquipamentos() {
     const listaContainer = document.getElementById('equipamentos-list');
-    if (!listaContainer) return; // Garante que estamos na tela correta
+    const custoTotalSpan = document.getElementById('custo-total-energia');
+
+    if (!listaContainer || !custoTotalSpan) return; 
 
     const valorKWh = parseFloat(document.getElementById('valor_kwh').value) || 0;
     let custoTotal = 0;
@@ -385,7 +421,7 @@ function renderizarEquipamentos() {
     if (equipamentos.length === 0) {
         htmlContent = '<p class="placeholder-text">Nenhum equipamento adicionado.</p>';
         listaContainer.innerHTML = htmlContent;
-        document.getElementById('custo-total-energia').textContent = `R$ 0.00`;
+        custoTotalSpan.textContent = `R$ 0.00`;
         return;
     }
 
@@ -397,6 +433,7 @@ function renderizarEquipamentos() {
         const minutos = Math.round((eq.tempoTotalH - horasInteiras) * 60);
         const tempoDisplay = `${horasInteiras}h ${minutos}m`;
 
+        // Passamos a função de remoção no onclick
         htmlContent += `
             <div class="equipamento-item">
                 <div class="item-info">
@@ -412,11 +449,12 @@ function renderizarEquipamentos() {
     });
 
     listaContainer.innerHTML = htmlContent;
-    document.getElementById('custo-total-energia').textContent = `R$ ${custoTotal.toFixed(2)}`;
+    custoTotalSpan.textContent = `R$ ${custoTotal.toFixed(2)}`;
 }
 
+
 // ========================================================
-// 4. GADGET 3: CALCULADORA DE PRODUTIVIDADE (RENDERIZAÇÃO)
+// 4. GADGET 3: CALCULADORA DE PRODUTIVIDADE (RENDERIZAÇÃO E LÓGICA)
 // ========================================================
 
 function renderProdutividade() {
@@ -464,28 +502,22 @@ function renderProdutividade() {
     attachProdutividadeListeners();
 }
 
-// --------------------------------------------------------
-// Lógica de Produtividade
-// --------------------------------------------------------
-
 function attachProdutividadeListeners() {
     document.getElementById('form-produtividade').addEventListener('submit', analisarProdutividade);
 }
 
+// Lógica de Produtividade (Mantida)
 function analisarProdutividade(event) {
     event.preventDefault();
 
     const horasTrabalho = parseFloat(document.getElementById('horas_trabalho').value) || 0;
     const tempoEstudo = parseFloat(document.getElementById('tempo_estudo').value) || 0;
-    const tempoLazer = parseFloat(document.getElementById('tempo_lazer').value) || 0;
     const tempoDistracao = parseFloat(document.getElementById('tempo_distracao').value) || 0;
-    const tempoDeslocamento = parseFloat(document.getElementById('tempo_deslocamento').value) || 0;
     const salarioHora = parseFloat(document.getElementById('salario_hora').value) || 0;
 
     const horasTotaisFoco = horasTrabalho + tempoEstudo;
-    const horasTotaisDia = horasTrabalho + tempoEstudo + tempoLazer + tempoDistracao + tempoDeslocamento;
 
-    if (horasTotaisDia === 0 || horasTotaisFoco + tempoDistracao === 0) {
+    if (horasTotaisFoco + tempoDistracao === 0) {
         document.getElementById('prod-insight').textContent = "Insira valores de tempo válidos para análise.";
         return;
     }
@@ -508,8 +540,9 @@ function analisarProdutividade(event) {
     document.getElementById('prod-insight').textContent = insight;
 }
 
+
 // ========================================================
-// 5. GADGET 4: GERADOR DE DOCUMENTOS (RENDERIZAÇÃO)
+// 5. GADGET 4: GERADOR DE DOCUMENTOS (RENDERIZAÇÃO E LÓGICA)
 // ========================================================
 
 function renderDocumentos() {
@@ -584,13 +617,17 @@ function renderDocumentos() {
     renderizarItensDoc();
 }
 
-// --------------------------------------------------------
-// Lógica de Documentos
-// --------------------------------------------------------
-
+/**
+ * Anexa o listener de submit ao formulário, resolvendo o problema de submissão.
+ */
 function attachDocumentosListeners() {
-    document.getElementById('form-documentos').addEventListener('submit', gerarDocumento);
+    const formDocumentos = document.getElementById('form-documentos');
+    if (formDocumentos) {
+        formDocumentos.addEventListener('submit', gerarDocumento);
+    }
 }
+
+// Lógica de Documentos (Mantida e ajustada)
 
 function getDocTitle(type) {
     if (type === 'Nota') return 'Nota Simples de Serviço';
@@ -611,7 +648,6 @@ function setDocType(type) {
 }
 
 function adicionarItemDoc() {
-    // ... (lógica de adicionar item - mantida)
     const descricao = document.getElementById('item_descricao').value.trim();
     const quantidade = parseInt(document.getElementById('item_quantidade').value);
     const valorUnitario = parseFloat(document.getElementById('item_valor').value);
@@ -632,6 +668,7 @@ function adicionarItemDoc() {
     docItens.push(novoItem);
     renderizarItensDoc();
 
+    // Limpa campos de adição
     document.getElementById('item_descricao').value = '';
     document.getElementById('item_quantidade').value = 1;
     document.getElementById('item_valor').value = 0.00;
@@ -648,7 +685,8 @@ function calculateDocTotal() {
 
 function renderizarItensDoc() {
     const listaContainer = document.getElementById('itens-list');
-    if (!listaContainer) return;
+    const valorTotalSpan = document.getElementById('doc-valor-total');
+    if (!listaContainer || !valorTotalSpan) return;
 
     let valorTotalDoc = 0;
     let htmlContent = '';
@@ -675,7 +713,7 @@ function renderizarItensDoc() {
     }
 
     listaContainer.innerHTML = htmlContent;
-    document.getElementById('doc-valor-total').textContent = `R$ ${valorTotalDoc.toFixed(2)}`;
+    valorTotalSpan.textContent = `R$ ${valorTotalDoc.toFixed(2)}`;
 }
 
 function gerarDocumento(event) {
@@ -706,6 +744,7 @@ function sharePdf(gadgetId) {
     
     alert(`[Ação Simulada]\nPreparando "${docTitle[gadgetId] || 'Relatório'}" para Download/Compartilhamento em PDF.`);
 }
+
 
 // ========================================================
 // 7. INICIALIZAÇÃO DA APLICAÇÃO
