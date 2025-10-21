@@ -5,7 +5,7 @@
 const appContainer = document.getElementById('app-content-container');
 let equipamentos = []; // Estado global para o gadget de Energia
 let docItens = [];     // Estado global para o gadget de Documentos
-let docType = 'OS';    // Estado global para o tipo de Documento
+let docType = 'OS';    // Estado global para o tipo de Documento (OS, Nota, Orcamento)
 
 // ========================================================
 // 1. O ROUTER E NAVEGAÇÃO
@@ -30,6 +30,7 @@ function showGadget(gadgetId) {
         appContainer.innerHTML = `<section class="gadget-screen"><h2>Em Desenvolvimento</h2><p>O gadget ${gadgetId} está sendo construído!</p></section>`;
     }
 
+    // Atualiza o estado 'active' na barra de navegação
     document.querySelectorAll('.app-nav .nav-item').forEach(item => {
         item.classList.remove('active');
         if (item.getAttribute('data-gadget-id') === gadgetId) {
@@ -156,7 +157,7 @@ function renderViagem() {
                         <p>Custos Extras (Arla + Diárias): <span id="custo-extras">R$ 0.00</span></p>
                         <p>Custo Total (TCO): <span id="custo-total-av">R$ 0.00</span></p>
                     </div>
-                     <button type="button" class="cta-button small-button action-button" onclick="sharePdf('viagem')">
+                     <button type="button" class="cta-button small-button action-button" onclick="generatePdf('viagem')">
                         Baixar/Compartilhar Relatório (PDF)
                     </button>
                 </form>
@@ -168,17 +169,15 @@ function renderViagem() {
 }
 
 /**
- * Anexa todos os listeners de formulário e checkbox, resolvendo o problema de submissão.
+ * Anexa todos os listeners de formulário e checkbox, corrigindo o problema da SPA.
  */
 function attachViagemListeners() {
-    // Listeners de Cálculo
     const formBasico = document.getElementById('form-viagem-basico');
     const formAvancado = document.getElementById('form-viagem-avancado');
 
     if (formBasico) formBasico.addEventListener('submit', calcularViagemBasico);
     if (formAvancado) formAvancado.addEventListener('submit', calcularViagemAvancado);
 
-    // Listeners de Checkbox para mostrar/esconder campos
     const checkPesado = document.getElementById('check_pesado');
     const checkDiarias = document.getElementById('check_diarias');
     
@@ -189,9 +188,8 @@ function attachViagemListeners() {
     showViagemModel('basico');
 }
 
-/**
- * Funções auxiliares para mostrar/esconder campos opcionais na Viagem.
- */
+// Funções auxiliares de Viagem
+
 function toggleHeavyVehicleFields() {
     const isChecked = document.getElementById('check_pesado').checked;
     document.getElementById('fields_pesado').classList.toggle('hidden', !isChecked);
@@ -207,7 +205,7 @@ function showViagemModel(model) {
     const avancado = document.getElementById('viagem-avancado');
     const buttons = document.querySelectorAll('#gadget-viagem .segment-control button');
 
-    if (!basico || !avancado) return; // Garante que estamos na tela correta
+    if (!basico || !avancado) return;
 
     buttons.forEach(btn => btn.classList.remove('active'));
     document.querySelector(`#gadget-viagem .segment-control button[data-model="${model}"]`).classList.add('active');
@@ -221,16 +219,19 @@ function showViagemModel(model) {
     }
 }
 
-// Lógica de Cálculo de Viagem (Mantida)
+/**
+ * Cálculo Básico (usando parseFloat para garantir float)
+ */
 function calcularViagemBasico(event) {
     event.preventDefault(); 
-    // ... lógica de cálculo básico ...
+    
+    // Todos os valores são tratados como float
     const precoCombustivel = parseFloat(document.getElementById('combustivel').value);
     const consumoMedio = parseFloat(document.getElementById('consumo').value);
     const distancia = parseFloat(document.getElementById('distancia').value);
 
     if (isNaN(precoCombustivel) || isNaN(consumoMedio) || isNaN(distancia) || consumoMedio <= 0) {
-        alert("Preencha todos os campos do modelo Básico com valores válidos.");
+        alert("Preencha todos os campos do modelo Básico com valores numéricos válidos.");
         return;
     }
 
@@ -241,27 +242,29 @@ function calcularViagemBasico(event) {
     document.getElementById('custo-total').textContent = `R$ ${custoTotal.toFixed(2)}`;
 }
 
+/**
+ * Cálculo Avançado (TCO)
+ */
 function calcularViagemAvancado(event) {
     event.preventDefault(); 
 
-    // Variáveis de Entrada Comuns
-    const precoCombustivel = parseFloat(document.getElementById('combustivel_av').value);
-    const consumoMedio = parseFloat(document.getElementById('consumo_av').value);
-    const distancia = parseFloat(document.getElementById('distancia_av').value);
-    const pedagios = parseFloat(document.getElementById('pedagios').value);
+    // Tratamento de float garantido pelo parseFloat()
+    const precoCombustivel = parseFloat(document.getElementById('combustivel_av').value) || 0;
+    const consumoMedio = parseFloat(document.getElementById('consumo_av').value) || 0;
+    const distancia = parseFloat(document.getElementById('distancia_av').value) || 0;
+    const pedagios = parseFloat(document.getElementById('pedagios').value) || 0;
     
-    // Variáveis de Manutenção
-    const custoPneu = parseFloat(document.getElementById('custo_pneu').value);
-    const kmPneu = parseFloat(document.getElementById('km_pneu').value);
-    const custoOleo = parseFloat(document.getElementById('custo_oleo').value);
-    const kmOleo = parseFloat(document.getElementById('km_oleo').value);
+    const custoPneu = parseFloat(document.getElementById('custo_pneu').value) || 0;
+    const kmPneu = parseFloat(document.getElementById('km_pneu').value) || 1; 
+    const custoOleo = parseFloat(document.getElementById('custo_oleo').value) || 0;
+    const kmOleo = parseFloat(document.getElementById('km_oleo').value) || 1;
 
-    if (isNaN(distancia) || consumoMedio <= 0 || kmPneu <= 0 || kmOleo <= 0) {
-         alert("Distância, Consumo, Km Pneu e Km Óleo devem ser maiores que zero.");
+    if (distancia <= 0 || consumoMedio <= 0) {
+         alert("Distância e Consumo devem ser maiores que zero.");
          return;
     }
 
-    // CÁLCULO DE CUSTOS DE MANUTENÇÃO
+    // CÁLCULO DE CUSTOS DE MANUTENÇÃO (Evita divisão por zero com || 1)
     const custoKmManutencaoTotal = (custoPneu / kmPneu) + (custoOleo / kmOleo);
     const custoTotalManutencaoViagem = distancia * custoKmManutencaoTotal;
 
@@ -298,7 +301,6 @@ function calcularViagemAvancado(event) {
 
     document.getElementById('custo-km-manutencao').textContent = `R$ ${custoKmManutencaoTotal.toFixed(4)}`; 
     document.getElementById('custo-extras').textContent = `R$ ${custoExtras.toFixed(2)}`;
-    document.getElementById('litros-gasto-av').textContent = litrosGasto.toFixed(2);
     document.getElementById('custo-total-av').textContent = `R$ ${custoTotalAvancado.toFixed(2)}`;
 }
 
@@ -349,7 +351,7 @@ function renderEnergia() {
             <div class="result-box final-result-box">
                 <p>Custo Total Mensal Estimado: <span id="custo-total-energia">R$ 0.00</span></p>
             </div>
-            <button type="button" class="cta-button small-button action-button" onclick="sharePdf('energia')">
+            <button type="button" class="cta-button small-button action-button" onclick="generatePdf('energia')">
                 Baixar/Compartilhar Relatório (PDF)
             </button>
         </section>
@@ -360,25 +362,22 @@ function renderEnergia() {
 
 function attachEnergiaListeners() {
     document.getElementById('form-novo-equipamento').addEventListener('submit', adicionarEquipamento);
-    // Recalcula a lista e total sempre que o valor do kWh é alterado
     document.getElementById('valor_kwh').addEventListener('change', renderizarEquipamentos);
     document.getElementById('valor_kwh').addEventListener('input', renderizarEquipamentos); 
 }
-
-// ... Lógica de Energia (Adicionar, Remover, Calcular, Renderizar) ...
 
 function adicionarEquipamento(event) {
     event.preventDefault();
 
     const nome = document.getElementById('nome_equipamento').value.trim();
-    const potencia = parseFloat(document.getElementById('potencia_w').value);
+    const potencia = parseFloat(document.getElementById('potencia_w').value) || 0;
     const tempoMin = parseFloat(document.getElementById('tempo_min').value) || 0;
     const tempoH = parseFloat(document.getElementById('tempo_h').value) || 0;
-    const dias = parseInt(document.getElementById('dias_uso').value);
+    const dias = parseInt(document.getElementById('dias_uso').value) || 0;
 
     const tempoTotalH = tempoH + (tempoMin / 60);
 
-    if (!nome || isNaN(potencia) || isNaN(tempoTotalH) || isNaN(dias) || potencia <= 0 || (tempoTotalH <= 0 && tempoMin == 0 && tempoH == 0) || dias <= 0) {
+    if (!nome || potencia <= 0 || (tempoTotalH <= 0 && tempoMin == 0 && tempoH == 0) || dias <= 0) {
         alert("Preencha os campos com valores válidos. O tempo de uso deve ser maior que zero.");
         return;
     }
@@ -433,7 +432,6 @@ function renderizarEquipamentos() {
         const minutos = Math.round((eq.tempoTotalH - horasInteiras) * 60);
         const tempoDisplay = `${horasInteiras}h ${minutos}m`;
 
-        // Passamos a função de remoção no onclick
         htmlContent += `
             <div class="equipamento-item">
                 <div class="item-info">
@@ -506,10 +504,10 @@ function attachProdutividadeListeners() {
     document.getElementById('form-produtividade').addEventListener('submit', analisarProdutividade);
 }
 
-// Lógica de Produtividade (Mantida)
 function analisarProdutividade(event) {
     event.preventDefault();
 
+    // Tratamento de float garantido pelo parseFloat()
     const horasTrabalho = parseFloat(document.getElementById('horas_trabalho').value) || 0;
     const tempoEstudo = parseFloat(document.getElementById('tempo_estudo').value) || 0;
     const tempoDistracao = parseFloat(document.getElementById('tempo_distracao').value) || 0;
@@ -607,7 +605,7 @@ function renderDocumentos() {
                 </div>
 
                 <button type="submit" class="cta-button">Gerar Documento</button>
-                <button type="button" class="cta-button small-button action-button" onclick="sharePdf('documentos')">
+                <button type="button" class="cta-button small-button action-button" onclick="generatePdf('documentos')">
                     Baixar/Compartilhar (PDF)
                 </button>
             </form>
@@ -617,17 +615,13 @@ function renderDocumentos() {
     renderizarItensDoc();
 }
 
-/**
- * Anexa o listener de submit ao formulário, resolvendo o problema de submissão.
- */
 function attachDocumentosListeners() {
     const formDocumentos = document.getElementById('form-documentos');
     if (formDocumentos) {
+        // O evento de submit só deve gerar o PDF se a submissão for válida
         formDocumentos.addEventListener('submit', gerarDocumento);
     }
 }
-
-// Lógica de Documentos (Mantida e ajustada)
 
 function getDocTitle(type) {
     if (type === 'Nota') return 'Nota Simples de Serviço';
@@ -643,17 +637,17 @@ function getDocItemsTitle(type) {
 
 function setDocType(type) {
     docType = type;
-    // Re-renderiza o gadget para atualizar títulos e botões
     renderDocumentos();
 }
 
 function adicionarItemDoc() {
     const descricao = document.getElementById('item_descricao').value.trim();
-    const quantidade = parseInt(document.getElementById('item_quantidade').value);
-    const valorUnitario = parseFloat(document.getElementById('item_valor').value);
+    // Tratamento de float garantido pelo parseFloat()
+    const quantidade = parseFloat(document.getElementById('item_quantidade').value) || 0;
+    const valorUnitario = parseFloat(document.getElementById('item_valor').value) || 0;
 
-    if (!descricao || isNaN(quantidade) || isNaN(valorUnitario) || quantidade <= 0 || valorUnitario < 0) {
-        alert("Preencha a descrição, quantidade e valor unitário do item.");
+    if (!descricao || quantidade <= 0 || valorUnitario < 0) {
+        alert("Preencha a descrição, quantidade (maior que zero) e valor unitário do item.");
         return;
     }
 
@@ -668,7 +662,6 @@ function adicionarItemDoc() {
     docItens.push(novoItem);
     renderizarItensDoc();
 
-    // Limpa campos de adição
     document.getElementById('item_descricao').value = '';
     document.getElementById('item_quantidade').value = 1;
     document.getElementById('item_valor').value = 0.00;
@@ -727,22 +720,82 @@ function gerarDocumento(event) {
         return;
     }
 
-    alert(`[Ação Simulada] Documento (${getDocTitle(docType)}) pronto para ser compartilhado!\nTotal: ${document.getElementById('doc-valor-total').textContent}`);
+    // Se a validação for OK, gera o PDF de verdade
+    generatePdf('documentos');
 }
 
 
 // ========================================================
-// 6. FUNÇÕES DE AÇÃO GERAL (PDF/Compartilhar)
+// 6. FUNÇÕES DE AÇÃO GERAL (PDF/Compartilhar) - REAIS
 // ========================================================
 
-function sharePdf(gadgetId) {
-    const docTitle = {
-        'viagem': 'Relatório de Custo de Viagem',
-        'energia': 'Relatório de Consumo de Energia',
-        'documentos': getDocTitle(docType)
-    };
+/**
+ * Função real para gerar e baixar um relatório em PDF usando html2canvas e jsPDF.
+ * @param {string} gadgetId - O ID do gadget (viagem, energia, documentos).
+ */
+function generatePdf(gadgetId) {
+    const content = document.querySelector(`#gadget-${gadgetId}`);
     
-    alert(`[Ação Simulada]\nPreparando "${docTitle[gadgetId] || 'Relatório'}" para Download/Compartilhamento em PDF.`);
+    if (!content || !window.html2canvas || !window.jspdf) {
+        alert("Erro: Conteúdo não encontrado ou bibliotecas jsPDF/html2canvas não carregadas.");
+        return;
+    }
+
+    // 1. Definição do título do documento
+    let title;
+    let fileName;
+
+    if (gadgetId === 'documentos') {
+        title = getDocTitle(docType).toUpperCase();
+        fileName = title.replace(/\s/g, '_') + '_' + Date.now();
+    } else {
+        title = gadgetId === 'viagem' ? 'RELATÓRIO DE CUSTO DE VIAGEM' : 'RELATÓRIO DE CONSUMO DE ENERGIA';
+        fileName = title.replace(/\s/g, '_');
+    }
+
+    // 2. Transforma o HTML em uma imagem (Canvas)
+    html2canvas(content, { 
+        scale: 2, 
+        useCORS: true 
+    }).then(canvas => {
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const imgData = canvas.toDataURL('image/png');
+        
+        const pdfWidth = 210;
+        const pdfHeight = 297; 
+
+        const imgWidth = pdfWidth - 20; 
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        
+        let position = 10; 
+
+        pdf.setFontSize(18);
+        pdf.text(title, 10, position);
+        position += 10;
+
+        let heightLeft = imgHeight;
+
+        while (heightLeft >= 0) {
+            let pageHeight = pdfHeight - 20; 
+            let currentCanvasHeight = Math.min(heightLeft, pageHeight);
+
+            // Ajuste na posição Y para renderizar o pedaço correto do canvas
+            const sHeight = (imgHeight - heightLeft);
+            
+            pdf.addImage(imgData, 'PNG', 10, position, imgWidth, currentCanvasHeight, undefined, 'FAST', 0, -sHeight);
+
+            heightLeft -= pageHeight;
+            position = 10;
+
+            if (heightLeft > -1) {
+                pdf.addPage();
+            }
+        }
+        
+        // 4. Salva o PDF
+        pdf.save(`${fileName}.pdf`);
+    });
 }
 
 
